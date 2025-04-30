@@ -8,6 +8,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -15,18 +17,24 @@ import (
 )
 
 type model struct {
-	sheetInput      textinput.Model
-	artistChosen    bool
-	headerStyles    lipgloss.Style
-	list            list.Model
-	selected        map[int]struct{}
-	menuFocus       string // "start", "sheetInput", "list"
-	menuChoice      int
-	termWidth       int
-	termHeight      int
-	downloadingFile bool
-	listItems       []list.Item
-	csvChosen       string
+	termWidth    int
+	termHeight   int
+	headerStyles lipgloss.Style
+
+	sheetInput textinput.Model
+
+	artistChosen bool
+	menuFocus    string // "start", "sheetInput", "list"
+	menuChoice   int
+
+	csvList   list.Model
+	listItems []list.Item
+	selected  map[int]struct{}
+	csvChosen string
+
+	csvTable table.Model
+	columns  []table.Column
+	rows     []table.Row
 }
 
 func main() {
@@ -40,16 +48,20 @@ func main() {
 func initialModel() model {
 	items, _ := filemgmt.ReturnListOfFiles()
 
+	loadingSpinner := spinner.New()
+	loadingSpinner.Spinner = spinner.Dot
+	loadingSpinner.Tick()
+
 	sheetInput := textinput.New()
 	sheetInput.Placeholder = "https://docs.google.com/spreadsheets/d/Sheet_ID/htmlview?gid=some_gid#gid=some_gid"
 	sheetInput.CharLimit = 200
 	sheetInput.Width = 81
 
-	additionalStyles := list.NewDefaultDelegate()
-	additionalStyles.Styles.SelectedTitle = styles.ListSelection
-	additionalStyles.Styles.SelectedDesc = styles.ListSelection
+	filesListAdditionalStyles := list.NewDefaultDelegate()
+	filesListAdditionalStyles.Styles.SelectedTitle = styles.ListSelection
+	filesListAdditionalStyles.Styles.SelectedDesc = styles.ListSelection
 
-	filesList := list.New(items, additionalStyles, 0, 0)
+	filesList := list.New(items, filesListAdditionalStyles, 0, 0)
 	osHomeDir, _ := os.UserHomeDir()
 	filesList.Title = "Browsing " + osHomeDir + "/Documents/tracker-tui"
 	filesList.Styles.Title = styles.ListTitle
@@ -76,16 +88,21 @@ func initialModel() model {
 		}
 	}
 
+	csvTableAdditionalStyles := table.DefaultStyles()
+	csvTableAdditionalStyles.Selected = styles.CsvTableSelectedStyle
+	csvTable := table.New()
+	csvTable.SetStyles(csvTableAdditionalStyles)
+
 	return model{
-		selected:        make(map[int]struct{}),
-		artistChosen:    false,
-		sheetInput:      sheetInput,
-		headerStyles:    styles.Header,
-		list:            filesList,
-		listItems:       items,
-		menuFocus:       "start", // <<<<<< start screen
-		menuChoice:      0,
-		downloadingFile: false,
+		selected:     make(map[int]struct{}),
+		artistChosen: false,
+		sheetInput:   sheetInput,
+		headerStyles: styles.Header,
+		csvList:      filesList,
+		listItems:    items,
+		menuFocus:    "start", // <<<<<< start screen
+		menuChoice:   0,
+		csvTable:     csvTable,
 	}
 }
 
@@ -117,7 +134,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var termWidth, termHeight, _ = term.GetSize(os.Stdout.Fd())
 		m.termWidth = termWidth
 		m.termHeight = termHeight
-		m.list.SetSize(termWidth, termHeight-4)
+		m.csvList.SetSize(termWidth, termHeight-4)
+		m.csvTable.SetHeight(termHeight - 3)
 	}
 	return m, cmd
 }
@@ -127,7 +145,7 @@ func (m model) View() string {
 
 	switch m.artistChosen {
 	case true:
-		s += styles.TextStyling.Width(m.termWidth).Render(m.csvChosen)
+		s += lipgloss.JoinHorizontal(lipgloss.Top, "\n"+styles.CsvTableBaseStyle.Render(m.csvTable.View()), "\n"+lipgloss.NewStyle().Width(m.termWidth-m.csvTable.Width()).Height(m.termHeight-1).Foreground(lipgloss.Color("#cdcdcd")).Background(lipgloss.Color("#8a9a7b")).Render("Music Player"))
 	case false:
 		switch m.menuFocus {
 		case "start":
@@ -145,7 +163,7 @@ func (m model) View() string {
 		case "sheetInput":
 			s += styles.TextStyling.Width(m.termWidth).Render("\nEnter the link to the Google Sheet Tracker:\n\n", m.sheetInput.View()+"\n\n")
 		case "list":
-			s += styles.DocStyle.Render(m.list.View())
+			s += styles.DocStyle.Render(m.csvList.View())
 		}
 	}
 	return s

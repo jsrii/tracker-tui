@@ -67,7 +67,16 @@ var (
 	ListSelection = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#8a9a7b")).
 			Border(tabBorder, false).
-			BorderForeground(lipgloss.Color("#8e8a7b")).
+			BorderForeground(lipgloss.Color("#8a9a7b")).
 			BorderLeft(true).
 			PaddingLeft(1)
+
+	CsvTableBaseStyle = lipgloss.NewStyle().
+				BorderStyle(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("240"))
+
+	CsvTableSelectedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#131313")).
+				Background(lipgloss.Color("#8a9a7b")).
+				Bold(false)
 )
