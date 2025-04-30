@@ -89,7 +89,7 @@ func ReadCSVFile(filename string) ([]table.Column, []table.Row, error) {
 
 func returnProperLength(record string, column int) int {
 	if column == 0 || column == 1 {
-		return 25
+		return 13 + 12*column // this is my favourite line out of all the files :3
 	}
 	for i := 1; i < len(record); i++ {
 		if record[i] == '(' {
