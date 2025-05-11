@@ -6,9 +6,11 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 type WriteCounter struct {
@@ -45,13 +47,35 @@ func ConvertSheetURL(sheetURL string) (string, error) {
 	return downloadURL, nil
 }
 
-func DownloadFile(url string, fallbackFilename string) (string, error) {
+func ConvertLink(input string) (string, error) {
+	parsedURL, err := url.Parse(input)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL: %w", err)
+	}
+
+	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
+	if len(parts) != 2 || parts[0] != "f" {
+		return "", fmt.Errorf("unexpected URL format")
+	}
+	downloadID := parts[1]
+
+	newURL := "https://api.pillowcase.su/api/download/" + downloadID
+	return newURL, nil
+}
+
+func DownloadFile(url string, fallbackFilename string, csvOrAudio bool) (string, error) {
 	homeDir, err := os.UserHomeDir()
+	var downloadDir string
+
 	if err != nil {
 		return "", err
 	}
+	if csvOrAudio {
+		downloadDir = filepath.Join(homeDir, "Documents", "tracker-tui", "csv")
+	} else {
+		downloadDir = filepath.Join(homeDir, "Documents", "tracker-tui", "songs")
 
-	downloadDir := filepath.Join(homeDir, "Documents", "tracker-tui")
+	}
 	err = os.MkdirAll(downloadDir, os.ModePerm)
 	if err != nil {
 		return "", err

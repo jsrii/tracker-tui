@@ -37,7 +37,7 @@ var (
 			BorderBottom(true)
 
 	ButtonStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFF7DB")).
+			Foreground(lipgloss.Color("#c5c9c5")).
 			Background(lipgloss.Color("#232323")).
 			Margin(1, 2, 0, 1).
 			Padding(0, 2)
@@ -51,7 +51,7 @@ var (
 
 	TextStyling = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color("#FAFAFA")).
+			Foreground(lipgloss.Color("#c5c9c5")).
 			Margin(0, 0, 0, 0).
 			Padding(1, 2)
 
@@ -79,4 +79,9 @@ var (
 				Foreground(lipgloss.Color("#131313")).
 				Background(lipgloss.Color("#8a9a7b")).
 				Bold(false)
+
+	CsvTableSelectedStyleAlt = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#c5c9c5")).
+					Background(lipgloss.Color("#232323")).
+					Bold(false)
 )

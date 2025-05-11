@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
+	"time"
 	"tracker-tui/filemgmt"
 	"tracker-tui/styles"
 
@@ -14,7 +16,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
+	"github.com/gopxl/beep"
+	"github.com/gopxl/beep/speaker"
 )
+
+type errMsg struct{ err error }
+type audioReadyMsg struct {
+	stream beep.StreamSeekCloser
+	format beep.Format
+}
 
 type model struct {
 	termWidth    int
@@ -26,15 +36,28 @@ type model struct {
 	artistChosen bool
 	menuFocus    string // "start", "sheetInput", "list"
 	menuChoice   int
+	csvList      list.Model
+	listItems    []list.Item
+	selected     map[int]struct{}
+	csvChosen    string
 
-	csvList   list.Model
-	listItems []list.Item
-	selected  map[int]struct{}
-	csvChosen string
-
-	csvTable table.Model
-	columns  []table.Column
-	rows     []table.Row
+	mainCSVTable   table.Model
+	erasTable      table.Model
+	columns        []table.Column
+	rows           []table.Row
+	mainColumns    []table.Column
+	mainRows       []table.Row
+	erasColumns    []table.Column
+	erasRows       []table.Row
+	selectedLink   string
+	selectedSong   table.Row
+	csvTableState  bool
+	isPlaying      bool
+	decodedFile    beep.StreamSeekCloser
+	fileFormat     beep.Format
+	tableWidth     int
+	controlState   bool
+	pControlSelect int
 }
 
 func main() {
@@ -43,9 +66,11 @@ func main() {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
+
 }
 
 func initialModel() model {
+	emptyRow := table.Row{"No Song Currently Selected", "", "", "", ""}
 	items, _ := filemgmt.ReturnListOfFiles()
 
 	loadingSpinner := spinner.New()
@@ -63,7 +88,7 @@ func initialModel() model {
 
 	filesList := list.New(items, filesListAdditionalStyles, 0, 0)
 	osHomeDir, _ := os.UserHomeDir()
-	filesList.Title = "Browsing " + osHomeDir + "/Documents/tracker-tui"
+	filesList.Title = "Browsing " + osHomeDir + "/Documents/tracker-tui/csv/"
 	filesList.Styles.Title = styles.ListTitle
 	filesList.KeyMap.Quit.SetEnabled(false)
 	filesList.KeyMap.Quit.Unbind()
@@ -88,21 +113,33 @@ func initialModel() model {
 		}
 	}
 
-	csvTableAdditionalStyles := table.DefaultStyles()
-	csvTableAdditionalStyles.Selected = styles.CsvTableSelectedStyle
-	csvTable := table.New()
-	csvTable.SetStyles(csvTableAdditionalStyles)
+	mainCSVTableAdditionalStyles := table.DefaultStyles()
+	mainCSVTableAdditionalStyles.Selected = styles.CsvTableSelectedStyle
+
+	mainCSVTable := table.New()
+	mainCSVTable.SetStyles(mainCSVTableAdditionalStyles)
+
+	erasTable := table.New()
+	erasTable.SetStyles(mainCSVTableAdditionalStyles)
 
 	return model{
-		selected:     make(map[int]struct{}),
-		artistChosen: false,
-		sheetInput:   sheetInput,
-		headerStyles: styles.Header,
-		csvList:      filesList,
-		listItems:    items,
-		menuFocus:    "start", // <<<<<< start screen
-		menuChoice:   0,
-		csvTable:     csvTable,
+		selected:       make(map[int]struct{}),
+		artistChosen:   false,
+		sheetInput:     sheetInput,
+		headerStyles:   styles.Header,
+		csvList:        filesList,
+		listItems:      items,
+		menuFocus:      "start", // <<<<<< start screen
+		menuChoice:     0,
+		mainCSVTable:   mainCSVTable,
+		erasTable:      erasTable,
+		selectedLink:   "Not Selected yet",
+		csvTableState:  false,
+		isPlaying:      false,
+		selectedSong:   emptyRow,
+		tableWidth:     44,
+		pControlSelect: 1,
+		controlState:   true,
 	}
 }
 
@@ -112,7 +149,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
+
 	case tea.KeyMsg:
 		switch m.artistChosen {
 		case true:
@@ -121,31 +160,104 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.menuFocus {
 			case "start":
 				return startControls(m, msg)
-
 			case "list":
 				return listControls(m, msg)
-
 			case "sheetInput":
 				return sheetInputControls(m, msg)
 			}
 		}
 
 	case tea.WindowSizeMsg:
-		var termWidth, termHeight, _ = term.GetSize(os.Stdout.Fd())
+		termWidth, termHeight, _ := term.GetSize(os.Stdout.Fd())
 		m.termWidth = termWidth
 		m.termHeight = termHeight
 		m.csvList.SetSize(termWidth, termHeight-4)
-		m.csvTable.SetHeight(termHeight - 3)
+		m.mainCSVTable.SetHeight(termHeight - 3)
+		m.erasTable.SetHeight(termHeight - 3)
+		cmd = tea.ClearScreen
+		return m, nil
+
+	case errMsg:
+		fmt.Println("Error:", msg.err)
+		return m, nil
+
+	case audioReadyMsg:
+		if m.isPlaying {
+			speaker.Clear()
+		}
+
+		m.decodedFile = msg.stream
+		m.fileFormat = msg.format
+		m.isPlaying = true
+
+		go func(stream beep.StreamSeekCloser, format beep.Format) {
+			speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+			done := make(chan bool)
+
+			speaker.Play(beep.Seq(stream, beep.Callback(func() {
+				done <- true
+			})))
+
+			<-done
+			m.isPlaying = false
+		}(msg.stream, msg.format)
+
+		return m, nil
 	}
+
 	return m, cmd
 }
 
 func (m model) View() string {
 	s := styles.Header.Width(m.termWidth).Render("tracker-tui")
 
+	if m.termWidth < 140 {
+		requiredWidth := 140
+
+		// Styles
+		highlight := lipgloss.NewStyle().Foreground(lipgloss.Color("1")) // Red
+		centered := lipgloss.NewStyle().Align(lipgloss.Center).Width(50)
+
+		// Compose message
+		msg := lipgloss.JoinVertical(lipgloss.Top,
+			"",
+			centered.Render("Terminal size too small:"),
+			centered.Render(fmt.Sprintf("  Width = %s",
+				highlight.Render(fmt.Sprint(m.termWidth)))),
+			"",
+			centered.Render("Needed for current config:"),
+			centered.Render(fmt.Sprintf("  Width = %d", requiredWidth)),
+		)
+
+		// Get terminal size
+
+		// Frame message to center
+		s += lipgloss.Place(m.termWidth, m.termHeight, lipgloss.Center, lipgloss.Center, msg)
+		return s
+	}
 	switch m.artistChosen {
 	case true:
-		s += lipgloss.JoinHorizontal(lipgloss.Top, "\n"+styles.CsvTableBaseStyle.Render(m.csvTable.View()), "\n"+lipgloss.NewStyle().Width(m.termWidth-m.csvTable.Width()).Height(m.termHeight-1).Foreground(lipgloss.Color("#cdcdcd")).Background(lipgloss.Color("#8a9a7b")).Render("Music Player"))
+		songName := lipgloss.NewStyle().Foreground(lipgloss.Color("#c4746e")).Height(3).Foreground(lipgloss.Color("#c4746e")).MarginBottom(2).AlignVertical(lipgloss.Center).PaddingLeft(1).PaddingRight(1).Render(filemgmt.FormatTitle(m.selectedSong[0]))
+		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".")[0])
+		prev := m.renderButton("<< prev", 0, m.controlState)
+		playPause := m.renderButton("play/pause", 1, m.controlState)
+		skip := m.renderButton("skip >>", 2, m.controlState)
+		playButtons := lipgloss.JoinHorizontal(lipgloss.Center, prev, playPause, skip)
+		var link string
+		if m.selectedLink == "Not Selected yet" {
+			link = m.selectedLink
+		} else {
+			link = "file from: https://" + strings.Split(strings.Split(m.selectedLink, "https://")[1], "/")[0]
+		}
+		link = lipgloss.NewStyle().MarginTop(1).Render(link)
+		player := lipgloss.JoinVertical(lipgloss.Center, songName, artist, playButtons, link)
+
+		if m.csvTableState {
+			s += lipgloss.JoinHorizontal(lipgloss.Center, "\n"+styles.CsvTableBaseStyle.Height(m.termHeight-3).Render(m.erasTable.View()), lipgloss.NewStyle().Width(m.termWidth-m.tableWidth-9).Height(m.termHeight-1).AlignVertical(lipgloss.Center).AlignHorizontal(lipgloss.Center).Render("\n"+player))
+		} else {
+			s += lipgloss.JoinHorizontal(lipgloss.Center, "\n"+styles.CsvTableBaseStyle.Height(m.termHeight-3).Render(m.mainCSVTable.View()), lipgloss.NewStyle().Width(m.termWidth-m.tableWidth-20).Height(m.termHeight-1).AlignVertical(lipgloss.Center).AlignHorizontal(lipgloss.Center).Render("\n"+player))
+
+		}
 	case false:
 		switch m.menuFocus {
 		case "start":
@@ -167,4 +279,22 @@ func (m model) View() string {
 		}
 	}
 	return s
+}
+
+func (m model) renderButton(label string, index int, parentState bool) string {
+	bg := lipgloss.Color("#232323")
+	fg := lipgloss.Color("#c5c9c5")
+	if m.pControlSelect == index && parentState {
+		bg = lipgloss.Color("#434343")
+		fg = lipgloss.Color("#c5c9c5")
+	} else if m.pControlSelect == index && !parentState {
+		bg = lipgloss.Color("#87a987")
+		fg = lipgloss.Color("#232323")
+	}
+	return lipgloss.NewStyle().
+		Foreground(fg).
+		Background(bg).
+		Padding(1).
+		MarginRight(1).
+		Render(label)
 }

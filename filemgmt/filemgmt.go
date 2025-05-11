@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	list "github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/table"
@@ -23,7 +24,7 @@ func ReturnListOfFiles() ([]list.Item, error) {
 	var items []list.Item
 
 	homeDir, _ := os.UserHomeDir()
-	downloadDir := filepath.Join(homeDir, "Documents", "tracker-tui")
+	downloadDir := filepath.Join(homeDir, "Documents", "tracker-tui", "csv")
 	err := os.MkdirAll(downloadDir, os.ModePerm)
 	if err != nil {
 		return nil, err
@@ -87,21 +88,56 @@ func ReadCSVFile(filename string) ([]table.Column, []table.Row, error) {
 	return columns, rows, nil
 }
 
+func GenerateMainTable(largeColumns []table.Column, largeRows []table.Row) ([]table.Column, []table.Row, error) {
+	var columns []table.Column
+	var rows []table.Row
+
+	columns = append(columns, table.Column{Title: "Files in Era", Width: 25})
+	columns = append(columns, table.Column{Title: "Name of Era", Width: 35})
+
+	for i := range largeRows {
+		if largeRows[i][len(largeRows[i])-2] == "" && len(largeRows[i][1]) > 1 && len(largeRows[i][0]) > 1 {
+			if len(largeRows[i]) >= 2 {
+				rows = append(rows, table.Row{
+					largeRows[i][0],
+					FormatTitle(largeRows[i][1]),
+				})
+			}
+		}
+	}
+
+	return columns, rows, nil
+}
+
+func GenerateEraTable(largeColumns []table.Column, largeRows []table.Row, matchString string) ([]table.Column, []table.Row, error) {
+	var columns []table.Column
+	var rows []table.Row
+	caseUpper := strings.ToUpper(FormatTitle(matchString))
+
+	if len(largeColumns) > 1 {
+		columns = append(columns, largeColumns[1:]...)
+	}
+
+	for i := range largeRows {
+		if strings.ToUpper(largeRows[i][0]) == caseUpper {
+			if len(largeRows[i]) > 1 {
+				rows = append(rows, largeRows[i][1:])
+			}
+		}
+	}
+
+	return columns, rows, nil
+}
+
 func returnProperLength(record string, column int) int {
 	if column == 0 || column == 1 {
-		return 13 + 12*column // this is my favourite line out of all the files :3
+		return 15 + 12*column // this is my favourite line out of all the files :3
 	}
-	for i := 1; i < len(record); i++ {
-		if record[i] == '(' {
-			return i
-		}
-		if isLower(record[i-1]) && isUpper(record[i]) {
-			return i
-		}
-		if isUpper(record[i-1]) && isLower(record[i]) && i > 5 {
-			return i - 1
-		}
+
+	if idx := strings.Index(record, "("); idx != -1 {
+		return idx
 	}
+
 	return len(record)
 }
 
@@ -111,4 +147,11 @@ func isLower(b byte) bool {
 
 func isUpper(b byte) bool {
 	return b >= 'A' && b <= 'Z'
+}
+
+func FormatTitle(input string) string {
+	if idx := strings.Index(input, "("); idx != -1 {
+		return strings.TrimSpace(input[:idx])
+	}
+	return strings.TrimSpace(input)
 }
