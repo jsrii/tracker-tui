@@ -1,7 +1,9 @@
 # tracker-tui
 
-The tui version of https://trackerhub.cx/, currently a made-in-progress
+The tui version of https://trackerhub.cx/, currently a made-in-progress, made with charm's tools
 
-### Sneak Peak
+### Previews
 
-![Alt text](/assets/sneakpeak.png)
+![unreleased csv's](/assets/trackertuifilebrowser.png)
+![eras view](/assets/trackertuiplayerview.png)
+![eras songs view](/assets/trackertuiplayerview1.png)
