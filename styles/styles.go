@@ -21,7 +21,8 @@ var (
 		Foreground(lipgloss.Color("#c4746e")).
 		Background(lipgloss.Color("#232323")).
 		PaddingTop(0).
-		PaddingRight(1).
+		PaddingRight(0).
+		PaddingLeft(1).
 		Align(lipgloss.Center)
 
 	DocStyle = lipgloss.NewStyle().
@@ -40,6 +41,7 @@ var (
 			Foreground(lipgloss.Color("#c5c9c5")).
 			Background(lipgloss.Color("#232323")).
 			Margin(1, 2, 0, 1).
+			AlignHorizontal(lipgloss.Center).
 			Padding(0, 2)
 
 	ActiveButtonStyle = ButtonStyle.
@@ -47,12 +49,12 @@ var (
 				Background(lipgloss.Color("#8a9a7b")).
 				Underline(true).
 				Margin(1, 2, 0, 1).
+				AlignHorizontal(lipgloss.Center).
 				Padding(0, 2)
 
 	TextStyling = lipgloss.NewStyle().
 			Align(lipgloss.Left).
 			Foreground(lipgloss.Color("#c5c9c5")).
-			Margin(0, 0, 0, 0).
 			Padding(1, 2)
 
 	ListTitle = lipgloss.NewStyle().

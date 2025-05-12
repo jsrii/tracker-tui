@@ -209,7 +209,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	s := styles.Header.Width(m.termWidth).Render("tracker-tui")
+	var s string
 
 	if m.termWidth < 140 {
 		requiredWidth := 140
@@ -237,6 +237,7 @@ func (m model) View() string {
 	}
 	switch m.artistChosen {
 	case true:
+		s = styles.Header.Width(m.termWidth).Render("tracker-tui")
 		songName := lipgloss.NewStyle().Foreground(lipgloss.Color("#c4746e")).Height(3).Foreground(lipgloss.Color("#c4746e")).MarginBottom(2).AlignVertical(lipgloss.Center).PaddingLeft(1).PaddingRight(1).Render(filemgmt.FormatTitle(m.selectedSong[0]))
 		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".")[0])
 		prev := m.renderButton("<< prev", 0, m.controlState)
@@ -261,6 +262,7 @@ func (m model) View() string {
 	case false:
 		switch m.menuFocus {
 		case "start":
+			headerLogo := styles.Header.Render("   __                  __                   __        _ \n  / /__________ ______/ /_____  _____      / /___  __(_)\n / __/ ___/ __ `/ ___/ //_/ _ \\/ ___/_____/ __/ / / / / \n/ /_/ /  / /_/ / /__/ ,< /  __/ /  /_____/ /_/ /_/ / /  \n\\__/_/   \\__,_/\\___/_/|_|\\___/_/         \\__/\\__,_/_/   \n                                                        ")
 			var okButton string
 			var cancelButton string
 			if m.menuChoice == 0 {
@@ -270,11 +272,19 @@ func (m model) View() string {
 				okButton = styles.ButtonStyle.MarginRight(3).Render("Yes (Add new link)")
 				cancelButton = styles.ActiveButtonStyle.Render("No (Browse)")
 			}
-			s += styles.TextStyling.Width(m.termWidth).Render("\n\nWould you like to add a new Unreleased Music tracker or browse ones you've already downloaded?")
-			s += lipgloss.JoinHorizontal(lipgloss.Top, okButton, cancelButton)
+			msg := lipgloss.JoinVertical(lipgloss.Top,
+				lipgloss.NewStyle().AlignHorizontal(lipgloss.Center).Width(m.termWidth).Render(headerLogo),
+				styles.TextStyling.Align(lipgloss.Center).Width(m.termWidth).Render("Enter in new Sheet Tracker link or browse downloaded trackers"),
+				lipgloss.NewStyle().AlignHorizontal(lipgloss.Center).Width(m.termWidth).Render(lipgloss.JoinHorizontal(lipgloss.Center, okButton, cancelButton)),
+			)
+
+			s += lipgloss.Place(m.termWidth, m.termHeight, lipgloss.Center, lipgloss.Center, msg)
+
 		case "sheetInput":
+			s = styles.Header.Width(m.termWidth).Render("tracker-tui")
 			s += styles.TextStyling.Width(m.termWidth).Render("\nEnter the link to the Google Sheet Tracker:\n\n", m.sheetInput.View()+"\n\n")
 		case "list":
+			s = styles.Header.Width(m.termWidth).Render("tracker-tui")
 			s += styles.DocStyle.Render(m.csvList.View())
 		}
 	}
