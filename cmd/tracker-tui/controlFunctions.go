@@ -217,6 +217,7 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.controlState {
 			switch m.pControlSelect {
 			case 0:
+				m.isDownloading = true
 				m.erasTable.MoveUp(1)
 				m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
 				m.selectedSong = m.erasTable.SelectedRow()
@@ -258,6 +259,7 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.isPlaying = true
 				}
 			case 2:
+				m.isDownloading = true
 				m.erasTable.MoveDown(1)
 				m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
 				m.selectedSong = m.erasTable.SelectedRow()
@@ -294,13 +296,13 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.csvTableState {
+			m.isDownloading = true
 			m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
 			m.selectedSong = m.erasTable.SelectedRow()
 			parsedLink, convertErr := download.ConvertLink(m.selectedLink)
 			if convertErr != nil {
 				return m, nil
 			}
-
 			return m, tea.Cmd(func() tea.Msg {
 				fileName, downloadErr := download.DownloadFile(parsedLink, "somesong.mp3", false)
 				if downloadErr != nil {

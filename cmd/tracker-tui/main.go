@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"tracker-tui/filemgmt"
@@ -44,24 +45,26 @@ type model struct {
 	selected     map[int]struct{}
 	csvChosen    string
 
-	mainCSVTable   table.Model
-	erasTable      table.Model
-	columns        []table.Column
-	rows           []table.Row
-	mainColumns    []table.Column
-	mainRows       []table.Row
-	erasColumns    []table.Column
-	erasRows       []table.Row
-	selectedLink   string
-	selectedSong   table.Row
-	csvTableState  bool
-	isPlaying      bool
-	decodedFile    beep.StreamSeekCloser
-	fileFormat     beep.Format
-	tableWidth     int
-	controlState   bool
-	pControlSelect int
-	songProgress   progress.Model
+	mainCSVTable    table.Model
+	erasTable       table.Model
+	columns         []table.Column
+	rows            []table.Row
+	mainColumns     []table.Column
+	mainRows        []table.Row
+	erasColumns     []table.Column
+	erasRows        []table.Row
+	selectedLink    string
+	selectedSong    table.Row
+	csvTableState   bool
+	isDownloading   bool
+	isPlaying       bool
+	decodedFile     beep.StreamSeekCloser
+	fileFormat      beep.Format
+	tableWidth      int
+	controlState    bool
+	pControlSelect  int
+	songProgress    progress.Model
+	downloadSpinner spinner.Model
 }
 
 func main() {
@@ -126,35 +129,41 @@ func initialModel() model {
 	erasTable := table.New()
 	erasTable.SetStyles(mainCSVTableAdditionalStyles)
 
+	downloadSpinner := spinner.New()
+	downloadSpinner.Spinner = spinner.Points
+	downloadSpinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#8a9a7b"))
+
 	return model{
-		selected:       make(map[int]struct{}),
-		artistChosen:   false,
-		sheetInput:     sheetInput,
-		headerStyles:   styles.Header,
-		csvList:        filesList,
-		listItems:      items,
-		menuFocus:      "start", // <<<<<< start screen
-		menuChoice:     0,
-		mainCSVTable:   mainCSVTable,
-		erasTable:      erasTable,
-		selectedLink:   "Not Selected yet",
-		csvTableState:  false,
-		isPlaying:      false,
-		selectedSong:   emptyRow,
-		tableWidth:     44,
-		pControlSelect: 1,
-		controlState:   true,
-		songProgress:   progress.New(progress.WithDefaultGradient(), progress.WithoutPercentage()),
+		selected:        make(map[int]struct{}),
+		artistChosen:    false,
+		sheetInput:      sheetInput,
+		headerStyles:    styles.Header,
+		csvList:         filesList,
+		listItems:       items,
+		menuFocus:       "start", // <<<<<< start screen
+		menuChoice:      0,
+		mainCSVTable:    mainCSVTable,
+		erasTable:       erasTable,
+		selectedLink:    "Not Selected yet",
+		csvTableState:   false,
+		isPlaying:       false,
+		selectedSong:    emptyRow,
+		tableWidth:      44,
+		pControlSelect:  1,
+		controlState:    true,
+		songProgress:    progress.New(progress.WithDefaultGradient(), progress.WithoutPercentage()),
+		downloadSpinner: downloadSpinner,
+		isDownloading:   false,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(m.downloadSpinner.Tick, textinput.Blink)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
+	var downloadSpinnerCmd tea.Cmd
 	switch msg := msg.(type) {
 	case tickMsg:
 		if m.isPlaying && m.decodedFile != nil {
@@ -199,6 +208,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case audioReadyMsg:
+		m.isDownloading = false
 		// speaker setup
 		if m.isPlaying {
 			speaker.Clear()
@@ -222,8 +232,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.songProgress.SetPercent(float64(m.decodedFile.Position()) / float64(m.decodedFile.Len()))
 		return m, tea.Batch(cmd, tick())
 	}
-
-	return m, cmd
+	m.downloadSpinner, downloadSpinnerCmd = m.downloadSpinner.Update(msg)
+	return m, tea.Batch(cmd, downloadSpinnerCmd)
 }
 
 func (m model) View() string {
@@ -255,7 +265,9 @@ func (m model) View() string {
 	}
 	switch m.artistChosen {
 	case true:
-		s = styles.Header.Width(m.termWidth).Render("tracker-tui")
+		var downloadSpinner string = ""
+
+		s = styles.Header.Width(m.termWidth).Render("tracker-tui" + strconv.FormatBool(m.isDownloading))
 		songName := lipgloss.NewStyle().Foreground(lipgloss.Color("#c4746e")).Height(3).Foreground(lipgloss.Color("#c4746e")).MarginBottom(2).AlignVertical(lipgloss.Center).PaddingLeft(1).PaddingRight(1).Render(filemgmt.FormatTitle(m.selectedSong[0]))
 		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".csv")[0])
 		prev := m.renderButton("<< prev", 0, m.controlState)
@@ -270,8 +282,10 @@ func (m model) View() string {
 		}
 		songProgression := lipgloss.NewStyle().MarginBottom(1).AlignHorizontal(lipgloss.Center).Render(m.songProgress.View())
 		link = lipgloss.NewStyle().MarginTop(1).Render(link)
-		player := lipgloss.JoinVertical(lipgloss.Center, songName, artist, songProgression, playButtons, link)
-
+		if m.isDownloading {
+			downloadSpinner = lipgloss.NewStyle().MarginTop(1).Render(m.downloadSpinner.View() + "  Downloading")
+		}
+		player := lipgloss.JoinVertical(lipgloss.Center, songName, artist, songProgression, playButtons, link, downloadSpinner)
 		if m.csvTableState {
 			s += lipgloss.JoinHorizontal(lipgloss.Center, "\n"+styles.CsvTableBaseStyle.Height(m.termHeight-3).Render(m.erasTable.View()), lipgloss.NewStyle().Width(m.termWidth-m.tableWidth-9).Height(m.termHeight-1).AlignVertical(lipgloss.Center).AlignHorizontal(lipgloss.Center).Render("\n"+player))
 		} else {
