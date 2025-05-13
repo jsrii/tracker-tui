@@ -13,6 +13,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gopxl/beep/speaker"
 )
 
 func startControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -129,8 +130,12 @@ func sheetInputControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if readErr != nil {
 				return m, tea.Quit
 			}
-			m.mainCSVTable.SetColumns(m.columns)
-			m.mainCSVTable.SetRows(m.rows)
+
+			mainColumns, mainRows, _ := filemgmt.GenerateMainTable(m.columns, m.rows)
+
+			m.mainCSVTable.SetColumns(mainColumns)
+			m.mainCSVTable.SetRows(mainRows)
+
 			m.mainCSVTable.Focus()
 			m.tableWidth = 44
 			return m, nil
@@ -186,8 +191,10 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mainCSVTable.SetColumns(mainColumns)
 			m.mainCSVTable.SetRows(mainRows)
 			m.csvTableState = false
-			m.mainCSVTable.Focus()
-			m.erasTable.Blur()
+			if m.controlState {
+				m.mainCSVTable.Focus()
+				m.erasTable.Blur()
+			}
 			m.tableWidth = 44
 			return m, tea.ClearScreen
 		} else {
@@ -198,11 +205,94 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.sheetInput.SetValue("")
 			m.menuFocus = "list"
 			m.menuChoice = 0
-			m.mainCSVTable.Blur()
+			if m.controlState {
+				m.erasTable.Focus()
+				m.mainCSVTable.Blur()
+			}
+
 			return m, tea.ClearScreen
 		}
 
 	case "enter", " ":
+		if !m.controlState {
+			switch m.pControlSelect {
+			case 0:
+				m.erasTable.MoveUp(1)
+				m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
+				m.selectedSong = m.erasTable.SelectedRow()
+				parsedLink, convertErr := download.ConvertLink(m.selectedLink)
+				if convertErr != nil {
+					return m, nil
+				}
+
+				return m, tea.Cmd(func() tea.Msg {
+					fileName, downloadErr := download.DownloadFile(parsedLink, "somesong.mp3", false)
+					if downloadErr != nil {
+						return errMsg{err: downloadErr}
+					}
+
+					homeDir, _ := os.UserHomeDir()
+					fullPath := filepath.Join(homeDir, "Documents", "tracker-tui", "songs", fileName)
+
+					// Wait for file to exist, but still inside a goroutine
+					for {
+						if _, err := os.Stat(fullPath); err == nil {
+							break
+						}
+						time.Sleep(1 * time.Second)
+					}
+
+					decodedFile, fileFormat, songErr := audio.ReturnPlayer(fullPath)
+					if songErr != nil {
+						return errMsg{err: songErr}
+					}
+
+					return audioReadyMsg{stream: decodedFile, format: fileFormat}
+				})
+			case 1:
+				if m.isPlaying {
+					speaker.Suspend()
+					m.isPlaying = false
+				} else {
+					speaker.Resume()
+					m.isPlaying = true
+				}
+			case 2:
+				m.erasTable.MoveDown(1)
+				m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
+				m.selectedSong = m.erasTable.SelectedRow()
+				parsedLink, convertErr := download.ConvertLink(m.selectedLink)
+				if convertErr != nil {
+					return m, nil
+				}
+
+				return m, tea.Cmd(func() tea.Msg {
+					fileName, downloadErr := download.DownloadFile(parsedLink, "somesong.mp3", false)
+					if downloadErr != nil {
+						return errMsg{err: downloadErr}
+					}
+
+					homeDir, _ := os.UserHomeDir()
+					fullPath := filepath.Join(homeDir, "Documents", "tracker-tui", "songs", fileName)
+
+					// Wait for file to exist, but still inside a goroutine
+					for {
+						if _, err := os.Stat(fullPath); err == nil {
+							break
+						}
+						time.Sleep(1 * time.Second)
+					}
+
+					decodedFile, fileFormat, songErr := audio.ReturnPlayer(fullPath)
+					if songErr != nil {
+						return errMsg{err: songErr}
+					}
+
+					return audioReadyMsg{stream: decodedFile, format: fileFormat}
+				})
+			}
+			return m, nil
+		}
 		if m.csvTableState {
 			m.selectedLink = m.erasTable.SelectedRow()[len(m.erasTable.SelectedRow())-1]
 			m.selectedSong = m.erasTable.SelectedRow()

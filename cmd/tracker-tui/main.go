@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -21,6 +22,8 @@ import (
 )
 
 type errMsg struct{ err error }
+type tickMsg time.Time
+
 type audioReadyMsg struct {
 	stream beep.StreamSeekCloser
 	format beep.Format
@@ -58,6 +61,7 @@ type model struct {
 	tableWidth     int
 	controlState   bool
 	pControlSelect int
+	songProgress   progress.Model
 }
 
 func main() {
@@ -140,6 +144,7 @@ func initialModel() model {
 		tableWidth:     44,
 		pControlSelect: 1,
 		controlState:   true,
+		songProgress:   progress.New(progress.WithDefaultGradient(), progress.WithoutPercentage()),
 	}
 }
 
@@ -151,6 +156,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case tickMsg:
+		if m.isPlaying && m.decodedFile != nil {
+			cmd = m.songProgress.SetPercent(float64(m.decodedFile.Position()) / float64(m.decodedFile.Len()))
+			return m, tea.Batch(cmd, tick())
+		}
+		return m, tick() // keep ticking even if paused
+	case progress.FrameMsg:
+		progressModel, cmd := m.songProgress.Update(msg)
+		m.songProgress = progressModel.(progress.Model)
+		return m, cmd
 
 	case tea.KeyMsg:
 		switch m.artistChosen {
@@ -174,7 +189,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.csvList.SetSize(termWidth, termHeight-4)
 		m.mainCSVTable.SetHeight(termHeight - 3)
 		m.erasTable.SetHeight(termHeight - 3)
-		cmd = tea.ClearScreen
+		if m.decodedFile != nil {
+			fmt.Print(float64(m.decodedFile.Position()) / float64(m.decodedFile.Len()))
+		}
 		return m, nil
 
 	case errMsg:
@@ -182,6 +199,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case audioReadyMsg:
+		// speaker setup
 		if m.isPlaying {
 			speaker.Clear()
 		}
@@ -199,10 +217,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})))
 
 			<-done
-			m.isPlaying = false
 		}(msg.stream, msg.format)
 
-		return m, nil
+		cmd := m.songProgress.SetPercent(float64(m.decodedFile.Position()) / float64(m.decodedFile.Len()))
+		return m, tea.Batch(cmd, tick())
 	}
 
 	return m, cmd
@@ -239,7 +257,7 @@ func (m model) View() string {
 	case true:
 		s = styles.Header.Width(m.termWidth).Render("tracker-tui")
 		songName := lipgloss.NewStyle().Foreground(lipgloss.Color("#c4746e")).Height(3).Foreground(lipgloss.Color("#c4746e")).MarginBottom(2).AlignVertical(lipgloss.Center).PaddingLeft(1).PaddingRight(1).Render(filemgmt.FormatTitle(m.selectedSong[0]))
-		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".")[0])
+		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".csv")[0])
 		prev := m.renderButton("<< prev", 0, m.controlState)
 		playPause := m.renderButton("play/pause", 1, m.controlState)
 		skip := m.renderButton("skip >>", 2, m.controlState)
@@ -250,8 +268,9 @@ func (m model) View() string {
 		} else {
 			link = "file from: https://" + strings.Split(strings.Split(m.selectedLink, "https://")[1], "/")[0]
 		}
+		songProgression := lipgloss.NewStyle().MarginBottom(1).AlignHorizontal(lipgloss.Center).Render(m.songProgress.View())
 		link = lipgloss.NewStyle().MarginTop(1).Render(link)
-		player := lipgloss.JoinVertical(lipgloss.Center, songName, artist, playButtons, link)
+		player := lipgloss.JoinVertical(lipgloss.Center, songName, artist, songProgression, playButtons, link)
 
 		if m.csvTableState {
 			s += lipgloss.JoinHorizontal(lipgloss.Center, "\n"+styles.CsvTableBaseStyle.Height(m.termHeight-3).Render(m.erasTable.View()), lipgloss.NewStyle().Width(m.termWidth-m.tableWidth-9).Height(m.termHeight-1).AlignVertical(lipgloss.Center).AlignHorizontal(lipgloss.Center).Render("\n"+player))
@@ -307,4 +326,10 @@ func (m model) renderButton(label string, index int, parentState bool) string {
 		Padding(1).
 		MarginRight(1).
 		Render(label)
+}
+
+func tick() tea.Cmd {
+	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }

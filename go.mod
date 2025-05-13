@@ -7,6 +7,7 @@ require github.com/charmbracelet/bubbletea v1.3.4
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
+	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/go-audio/audio v1.0.0 // indirect
