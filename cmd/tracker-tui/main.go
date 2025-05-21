@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 	"tracker-tui/filemgmt"
@@ -267,7 +266,7 @@ func (m model) View() string {
 	case true:
 		var downloadSpinner string = ""
 
-		s = styles.Header.Width(m.termWidth).Render("tracker-tui" + strconv.FormatBool(m.isDownloading))
+		s = styles.Header.Width(m.termWidth).Render("tracker-tui")
 		songName := lipgloss.NewStyle().Foreground(lipgloss.Color("#c4746e")).Height(3).Foreground(lipgloss.Color("#c4746e")).MarginBottom(2).AlignVertical(lipgloss.Center).PaddingLeft(1).PaddingRight(1).Render(filemgmt.FormatTitle(m.selectedSong[0]))
 		artist := lipgloss.NewStyle().MarginBottom(1).Render(strings.Split(m.csvChosen, ".csv")[0])
 		prev := m.renderButton("<< prev", 0, m.controlState)
