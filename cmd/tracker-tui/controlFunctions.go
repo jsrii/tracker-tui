@@ -304,7 +304,7 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, tea.Cmd(func() tea.Msg {
-				fileName, downloadErr := download.DownloadFile(parsedLink, "somesong.mp3", false)
+				fileName, downloadErr := download.DownloadFile(parsedLink, m.selectedSong[1], false)
 				if downloadErr != nil {
 					return errMsg{err: downloadErr}
 				}

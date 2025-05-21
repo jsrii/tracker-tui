@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -53,12 +54,18 @@ func ConvertLink(input string) (string, error) {
 		return "", fmt.Errorf("invalid URL: %w", err)
 	}
 
+	host := strings.ToLower(parsedURL.Host)
+	if strings.Contains(host, "youtube.com") || strings.Contains(host, "youtu.be") {
+		// Just return the original input for YouTube links
+		return input, nil
+	}
+
 	parts := strings.Split(strings.Trim(parsedURL.Path, "/"), "/")
 	if len(parts) != 2 || parts[0] != "f" {
 		return "", fmt.Errorf("unexpected URL format")
 	}
-	downloadID := parts[1]
 
+	downloadID := parts[1]
 	newURL := "https://api.pillowcase.su/api/download/" + downloadID
 	return newURL, nil
 }
@@ -66,6 +73,11 @@ func ConvertLink(input string) (string, error) {
 func DownloadFile(url string, fallbackFilename string, csvOrAudio bool) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	var downloadDir string
+
+	if strings.HasPrefix(url, "https://youtu") {
+		filepath, error := downloadFromYT(url, fallbackFilename)
+		return filepath, error
+	}
 
 	if err != nil {
 		return "", err
@@ -131,6 +143,31 @@ func DownloadFile(url string, fallbackFilename string, csvOrAudio bool) (string,
 	}
 
 	return filename, nil
+}
+
+func downloadFromYT(url string, fallbackFilename string) (string, error) {
+	homeDir, _ := os.UserHomeDir()
+	downloadDir := filepath.Join(homeDir, "Documents", "tracker-tui", "songs")
+
+	err := os.MkdirAll(downloadDir, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	// yt-dlp -o "~/Documents/tracker-tui/songs/%(title)s.%(ext)s" -t mp3 https://youtu.be/sA3TpJzsFHc
+	outputTemplate := fmt.Sprintf("%s/Documents/tracker-tui/songs/%s.%%(ext)s", homeDir, fallbackFilename)
+	cmd := exec.Command(
+		"yt-dlp",
+		"-x",
+		"--audio-format", "mp3",
+		"-o", outputTemplate,
+		url,
+	)
+	// Run the command
+	if err := cmd.Run(); err != nil {
+		return "", nil
+	}
+	return fallbackFilename + ".mp3", nil
 }
 
 // sanitizeFilename replaces all slashes and backslashes with underscores
