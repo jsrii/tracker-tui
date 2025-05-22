@@ -37,8 +37,7 @@ type model struct {
 	sheetInput textinput.Model
 
 	artistChosen bool
-	menuFocus    string // "start", "sheetInput", "list"
-	menuChoice   int
+	menuFocus    string
 	csvList      list.Model
 	listItems    []list.Item
 	selected     map[int]struct{}
@@ -48,8 +47,6 @@ type model struct {
 	erasTable       table.Model
 	columns         []table.Column
 	rows            []table.Row
-	mainColumns     []table.Column
-	mainRows        []table.Row
 	erasColumns     []table.Column
 	erasRows        []table.Row
 	selectedLink    string
@@ -67,6 +64,10 @@ type model struct {
 }
 
 func main() {
+	if err := filemgmt.InitTheme(); err != nil {
+		fmt.Printf("theme load error: %v\n", err)
+		os.Exit(1)
+	}
 	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
@@ -139,8 +140,7 @@ func initialModel() model {
 		headerStyles:    styles.Header,
 		csvList:         filesList,
 		listItems:       items,
-		menuFocus:       "start", // <<<<<< start screen
-		menuChoice:      0,
+		menuFocus:       "start",
 		mainCSVTable:    mainCSVTable,
 		erasTable:       erasTable,
 		selectedLink:    "Not Selected yet",
@@ -297,13 +297,8 @@ func (m model) View() string {
 			headerLogo := styles.Header.Render("   __                  __                   __        _ \n  / /__________ ______/ /_____  _____      / /___  __(_)\n / __/ ___/ __ `/ ___/ //_/ _ \\/ ___/_____/ __/ / / / / \n/ /_/ /  / /_/ / /__/ ,< /  __/ /  /_____/ /_/ /_/ / /  \n\\__/_/   \\__,_/\\___/_/|_|\\___/_/         \\__/\\__,_/_/   \n                                                        ")
 			var okButton string
 			var cancelButton string
-			if m.menuChoice == 0 {
-				okButton = styles.ActiveButtonStyle.MarginRight(3).Render("Yes (Add new link)")
-				cancelButton = styles.ButtonStyle.Render("No (Browse)")
-			} else {
-				okButton = styles.ButtonStyle.MarginRight(3).Render("Yes (Add new link)")
-				cancelButton = styles.ActiveButtonStyle.Render("No (Browse)")
-			}
+			okButton = m.renderButton("Yes (Add new link)", 0, false)
+			cancelButton = m.renderButton("No (Browse)", 1, false)
 			msg := lipgloss.JoinVertical(lipgloss.Top,
 				lipgloss.NewStyle().AlignHorizontal(lipgloss.Center).Width(m.termWidth).Render(headerLogo),
 				styles.TextStyling.Align(lipgloss.Center).Width(m.termWidth).Render("Enter in new Sheet Tracker link or browse downloaded trackers"),
@@ -324,14 +319,14 @@ func (m model) View() string {
 }
 
 func (m model) renderButton(label string, index int, parentState bool) string {
-	bg := lipgloss.Color("#232323")
-	fg := lipgloss.Color("#c5c9c5")
+	bg := styles.ColorActiveUnselectedBtnBG
+	fg := styles.ColorActiveUnselectedBtnFG
 	if m.pControlSelect == index && parentState {
-		bg = lipgloss.Color("#434343")
-		fg = lipgloss.Color("#c5c9c5")
+		bg = styles.ColorAltSelectedBtnBG
+		fg = styles.ColorAltSelectedBtnFG
 	} else if m.pControlSelect == index && !parentState {
-		bg = lipgloss.Color("#87a987")
-		fg = lipgloss.Color("#232323")
+		bg = styles.ColorActiveSelectedBtnBG
+		fg = styles.ColorActiveSelectedBtnFG
 	}
 	return lipgloss.NewStyle().
 		Foreground(fg).

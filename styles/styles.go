@@ -4,6 +4,32 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Define all color constants in one place
+var (
+	ColorPrimary       = lipgloss.Color("#c4746e")
+	ColorBackground    = lipgloss.Color("#232323")
+	ColorText          = lipgloss.Color("#c5c9c5")
+	ColorAccent        = lipgloss.Color("#8a9a7b")
+	ColorHighlight     = lipgloss.Color("#8ba4b0")
+	ColorDialogBorder  = lipgloss.Color("#874BFD")
+	ColorTableBorder   = lipgloss.Color("240")
+	ColorSelectedText  = lipgloss.Color("#131313")
+	ColorAltText       = lipgloss.Color("#c5c9c5")
+	ColorAltBackground = lipgloss.Color("#232323")
+	ColorListSelection = lipgloss.Color("#8a9a7b")
+	ColorListTitleFg   = lipgloss.Color("#232323")
+
+	ColorActiveSelectedBtnFG = lipgloss.Color("#232323")
+	ColorActiveSelectedBtnBG = lipgloss.Color("#87a987")
+
+	ColorActiveUnselectedBtnFG = lipgloss.Color("#c5c9c5")
+	ColorActiveUnselectedBtnBG = lipgloss.Color("#232323")
+
+	ColorAltSelectedBtnFG = lipgloss.Color("#c5c9c5")
+	ColorAltSelectedBtnBG = lipgloss.Color("#434343")
+)
+
+// Define styles
 var (
 	tabBorder = lipgloss.Border{
 		Top:         "─",
@@ -18,8 +44,8 @@ var (
 
 	Header = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#c4746e")).
-		Background(lipgloss.Color("#232323")).
+		Foreground(ColorPrimary).
+		Background(ColorBackground).
 		PaddingTop(0).
 		PaddingRight(0).
 		PaddingLeft(1).
@@ -30,7 +56,7 @@ var (
 
 	DialogBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#874BFD")).
+			BorderForeground(ColorDialogBorder).
 			Padding(1, 0).
 			BorderTop(true).
 			BorderLeft(true).
@@ -38,52 +64,45 @@ var (
 			BorderBottom(true)
 
 	ButtonStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#c5c9c5")).
-			Background(lipgloss.Color("#232323")).
+			Foreground(ColorText).
+			Background(ColorBackground).
 			Margin(1, 2, 0, 1).
 			AlignHorizontal(lipgloss.Center).
 			Padding(0, 2)
 
 	ActiveButtonStyle = ButtonStyle.
-				Foreground(lipgloss.Color("#232323")).
-				Background(lipgloss.Color("#8a9a7b")).
-				Underline(true).
-				Margin(1, 2, 0, 1).
-				AlignHorizontal(lipgloss.Center).
-				Padding(0, 2)
+				Foreground(ColorBackground).
+				Background(ColorAccent).
+				Underline(true)
 
 	TextStyling = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color("#c5c9c5")).
+			Foreground(ColorText).
 			Padding(1, 2)
 
 	ListTitle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#232323")).
-			Background(lipgloss.Color("#8ba4b0")).
+			Foreground(ColorListTitleFg).
+			Background(ColorHighlight).
 			Padding(0, 1)
 
-	ListStatusMessageStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "#04B575", Dark: "#04B575"}).
-				Render
-
 	ListSelection = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#8a9a7b")).
+			Foreground(ColorListSelection).
 			Border(tabBorder, false).
-			BorderForeground(lipgloss.Color("#8a9a7b")).
+			BorderForeground(ColorListSelection).
 			BorderLeft(true).
 			PaddingLeft(1)
 
 	CsvTableBaseStyle = lipgloss.NewStyle().
 				BorderStyle(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("240"))
+				BorderForeground(ColorTableBorder)
 
 	CsvTableSelectedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#131313")).
-				Background(lipgloss.Color("#8a9a7b")).
+				Foreground(ColorSelectedText).
+				Background(ColorAccent).
 				Bold(false)
 
 	CsvTableSelectedStyleAlt = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#c5c9c5")).
-					Background(lipgloss.Color("#232323")).
+					Foreground(ColorAltText).
+					Background(ColorAltBackground).
 					Bold(false)
 )

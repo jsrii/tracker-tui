@@ -2,16 +2,40 @@ package filemgmt
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"tracker-tui/styles"
 
 	list "github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/lipgloss"
 )
 
+type Theme struct {
+	ColorPrimary               string
+	ColorBackground            string
+	ColorText                  string
+	ColorAccent                string
+	ColorHighlight             string
+	ColorDialogBorder          string
+	ColorTableBorder           string
+	ColorSelectedText          string
+	ColorStatusMessage         map[string]string
+	ColorAltText               string
+	ColorAltBackground         string
+	ColorListSelection         string
+	ColorListTitleFg           string
+	ColorActiveSelectedBtnFG   string
+	ColorActiveSelectedBtnBG   string
+	ColorActiveUnselectedBtnFG string
+	ColorActiveUnselectedBtnBG string
+	ColorAltSelectedBtnFG      string
+	ColorAltSelectedBtnBG      string
+}
 type item struct {
 	fileName, dateOfCreation string
 }
@@ -141,17 +165,85 @@ func returnProperLength(record string, column int) int {
 	return len(record)
 }
 
-func isLower(b byte) bool {
-	return b >= 'a' && b <= 'z'
-}
-
-func isUpper(b byte) bool {
-	return b >= 'A' && b <= 'Z'
-}
-
 func FormatTitle(input string) string {
 	if idx := strings.Index(input, "("); idx != -1 {
 		return strings.TrimSpace(input[:idx])
 	}
 	return strings.TrimSpace(input)
+}
+
+func InitTheme() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("could not determine home directory: %w", err)
+	}
+
+	configDir := filepath.Join(homeDir, "Documents", "tracker-tui")
+	configPath := filepath.Join(configDir, "config.json")
+
+	// Ensure config dir exists
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		defaultTheme := Theme{
+			ColorPrimary:               "#c4746e",
+			ColorBackground:            "#232323",
+			ColorText:                  "#c5c9c5",
+			ColorAccent:                "#8a9a7b",
+			ColorHighlight:             "#8ba4b0",
+			ColorDialogBorder:          "#874BFD",
+			ColorTableBorder:           "240",
+			ColorSelectedText:          "#131313",
+			ColorAltText:               "#c5c9c5",
+			ColorAltBackground:         "#232323",
+			ColorListSelection:         "#8a9a7b",
+			ColorListTitleFg:           "#232323",
+			ColorActiveSelectedBtnFG:   "#232323",
+			ColorActiveSelectedBtnBG:   "#87a987",
+			ColorActiveUnselectedBtnFG: "#c5c9c5",
+			ColorActiveUnselectedBtnBG: "#232323",
+			ColorAltSelectedBtnFG:      "#c5c9c5",
+			ColorAltSelectedBtnBG:      "#434343",
+		}
+
+		data, _ := json.MarshalIndent(defaultTheme, "", "  ")
+		if err := os.WriteFile(configPath, data, 0644); err != nil {
+			return fmt.Errorf("could not write default config: %w", err)
+		}
+	}
+
+	// Read and apply the config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("could not read config: %w", err)
+	}
+
+	var theme Theme
+	if err := json.Unmarshal(data, &theme); err != nil {
+		return fmt.Errorf("invalid theme config: %w", err)
+	}
+
+	// Set the theme
+	styles.ColorPrimary = lipgloss.Color(theme.ColorPrimary)
+	styles.ColorBackground = lipgloss.Color(theme.ColorBackground)
+	styles.ColorText = lipgloss.Color(theme.ColorText)
+	styles.ColorAccent = lipgloss.Color(theme.ColorAccent)
+	styles.ColorHighlight = lipgloss.Color(theme.ColorHighlight)
+	styles.ColorDialogBorder = lipgloss.Color(theme.ColorDialogBorder)
+	styles.ColorTableBorder = lipgloss.Color(theme.ColorTableBorder)
+	styles.ColorSelectedText = lipgloss.Color(theme.ColorSelectedText)
+	styles.ColorAltText = lipgloss.Color(theme.ColorAltText)
+	styles.ColorAltBackground = lipgloss.Color(theme.ColorAltBackground)
+	styles.ColorListSelection = lipgloss.Color(theme.ColorListSelection)
+	styles.ColorListTitleFg = lipgloss.Color(theme.ColorListTitleFg)
+	styles.ColorActiveSelectedBtnFG = lipgloss.Color(theme.ColorActiveSelectedBtnFG)
+	styles.ColorActiveSelectedBtnBG = lipgloss.Color(theme.ColorActiveSelectedBtnBG)
+	styles.ColorActiveUnselectedBtnFG = lipgloss.Color(theme.ColorActiveUnselectedBtnFG)
+	styles.ColorActiveUnselectedBtnBG = lipgloss.Color(theme.ColorActiveUnselectedBtnBG)
+	styles.ColorAltSelectedBtnFG = lipgloss.Color(theme.ColorAltSelectedBtnFG)
+	styles.ColorAltSelectedBtnBG = lipgloss.Color(theme.ColorAltSelectedBtnBG)
+
+	return nil
 }

@@ -21,21 +21,22 @@ func startControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "esc":
 		return m, tea.Quit
 	case "left":
-		m.menuChoice = 0
+		m.pControlSelect = 0
 		return m, nil
 	case "right":
-		m.menuChoice = 1
+		m.pControlSelect = 1
 		return m, nil
 
 	case "enter":
 		m.sheetInput.Blur()
-		if m.menuChoice == 0 {
+		if m.pControlSelect == 0 {
 			m.menuFocus = "sheetInput"
 			m.sheetInput.Focus()
 		} else {
 			items, _ := filemgmt.ReturnListOfFiles()
 			m.csvList.SetItems(items)
 			m.menuFocus = "list"
+			m.pControlSelect = 1
 		}
 		return m, nil
 	}
@@ -52,7 +53,7 @@ func listControls(m model, msg tea.KeyMsg) (model, tea.Cmd) {
 		m.artistChosen = false
 		m.sheetInput.SetValue("")
 		m.menuFocus = "start"
-		m.menuChoice = 0
+		m.pControlSelect = 1
 		return m, nil
 	case "enter":
 		clear(m.columns)
@@ -67,7 +68,6 @@ func listControls(m model, msg tea.KeyMsg) (model, tea.Cmd) {
 		m.artistChosen = true
 		m.sheetInput.SetValue("")
 		m.menuFocus = "start"
-		m.menuChoice = 0
 
 		homeDir, _ = os.UserHomeDir()
 
@@ -83,6 +83,7 @@ func listControls(m model, msg tea.KeyMsg) (model, tea.Cmd) {
 
 		m.mainCSVTable.Focus()
 		m.csvTableState = false
+		m.pControlSelect = 1
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -102,7 +103,7 @@ func sheetInputControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.artistChosen = false
 		m.sheetInput.SetValue("")
 		m.menuFocus = "start"
-		m.menuChoice = 0
+		m.pControlSelect = 0
 		return m, nil
 
 	case "enter":
@@ -138,6 +139,7 @@ func sheetInputControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 			m.mainCSVTable.Focus()
 			m.tableWidth = 44
+			m.pControlSelect = 1
 			return m, nil
 		}
 	}
@@ -204,7 +206,6 @@ func playerControls(m model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.artistChosen = false
 			m.sheetInput.SetValue("")
 			m.menuFocus = "list"
-			m.menuChoice = 0
 			if m.controlState {
 				m.erasTable.Focus()
 				m.mainCSVTable.Blur()
